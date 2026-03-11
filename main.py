@@ -29,10 +29,24 @@ def get_top_articles():
             for entry in feed.entries[:5]:
                 title = entry.get("title", "")
                 summary = entry.get("summary", "")[:300]
-                articles.append({"title": title, "summary": summary, "source": feed.feed.get("title", "")})
+                image = None
+                if "media_thumbnail" in entry:
+                    image = entry.media_thumbnail[0].get("url")
+                elif "media_content" in entry:
+                    image = entry.media_content[0].get("url")
+                elif "links" in entry:
+                    for link in entry.links:
+                        if link.get("type", "").startswith("image"):
+                            image = link.get("href")
+                articles.append({
+                    "title": title,
+                    "summary": summary,
+                    "source": feed.feed.get("title", ""),
+                    "image": image
+                })
         except:
             continue
-    return articles[:9]
+    return articles
 
 def generate_tweet(article):
     message = anthropic_client.messages.create(
@@ -46,32 +60,38 @@ def generate_tweet(article):
 async def send_daily_tweets():
     await client.wait_until_ready()
     channel = client.get_channel(CHANNEL_ID)
-    
-    SEND_HOURS = [9, 15, 21]
-    
+    sent_today = False
+
     while not client.is_closed():
         now = datetime.now()
-        if now.hour in SEND_HOURS and now.minute == 0:
+        if now.hour == 9 and now.minute == 0 and not sent_today:
             articles = get_top_articles()
             if articles and channel:
                 import random
                 selected = random.sample(articles, min(3, len(articles)))
+                await channel.send("🎬 **Tes 3 tweets du jour sont arrivés !**")
                 for i, article in enumerate(selected):
                     try:
                         tweet = generate_tweet(article)
                         embed = discord.Embed(
-                            title=f"🎬 Tweet #{i+1} — {now.strftime('%H:%M')}",
+                            title=f"Tweet #{i+1}",
                             description=f"```{tweet}```",
                             color=0xe8c96d
                         )
                         embed.add_field(name="Source", value=article["source"], inline=True)
                         embed.add_field(name="Mots", value=str(len(tweet.split())) + "/30", inline=True)
                         embed.add_field(name="Article", value=article["title"][:80], inline=False)
+                        if article.get("image"):
+                            embed.set_image(url=article["image"])
                         await channel.send(embed=embed)
-                        await asyncio.sleep(5)
+                        await asyncio.sleep(2)
                     except Exception as e:
                         print(f"Erreur: {e}")
+            sent_today = True
             await asyncio.sleep(60)
+        elif now.hour == 10:
+            sent_today = False
+            await asyncio.sleep(30)
         else:
             await asyncio.sleep(30)
 
@@ -95,15 +115,8 @@ async def tweet_now(interaction: discord.Interaction):
     embed.add_field(name="Source", value=article["source"], inline=True)
     embed.add_field(name="Mots", value=str(len(tweet.split())) + "/30", inline=True)
     embed.add_field(name="Article", value=article["title"][:80], inline=False)
+    if article.get("image"):
+        embed.set_image(url=article["image"])
     await interaction.followup.send(embed=embed)
 
 client.run(os.environ["DISCORD_TOKEN"])
-```
-
----
-
-Ensuite crée un 2ème fichier dans GitHub nommé `requirements.txt` avec :
-```
-discord.py
-anthropic
-feedparser
