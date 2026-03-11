@@ -5,6 +5,7 @@ import asyncio
 import feedparser
 import google.generativeai as genai
 from datetime import datetime
+import random
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -43,12 +44,13 @@ def get_top_articles():
                     "source": feed.feed.get("title", ""),
                     "image": image
                 })
-        except:
+        except Exception as e:
+            print("Feed error: " + str(e))
             continue
     return articles
 
 def generate_tweet(article):
-    prompt = f"You are a viral cinema Twitter account. Write a punchy English tweet about this movie news. Maximum 30 words. Strong opinion. Return ONLY the tweet text.\n\nTitle: {article['title']}\nSummary: {article['summary']}"
+    prompt = "You are a viral cinema Twitter account. Write a punchy English tweet about this movie news. Maximum 30 words. Strong opinion. Return ONLY the tweet text.\n\nTitle: " + article["title"] + "\nSummary: " + article["summary"]
     response = model.generate_content(prompt)
     return response.text.strip()
 
@@ -62,14 +64,13 @@ async def send_daily_tweets():
         if now.hour == 9 and now.minute == 0 and not sent_today:
             articles = get_top_articles()
             if articles and channel:
-                import random
                 selected = random.sample(articles, min(3, len(articles)))
-                await channel.send("🎬 **Tes 3 tweets du jour !**")
+                await channel.send("Tes 3 tweets du jour sont arrives !")
                 for i, article in enumerate(selected):
                     try:
                         tweet = generate_tweet(article)
                         embed = discord.Embed(
-                            title=f"Tweet #{i+1}",
+                            title="Tweet #" + str(i+1),
                             description="```" + tweet + "```",
                             color=0xe8c96d
                         )
@@ -81,7 +82,7 @@ async def send_daily_tweets():
                         await channel.send(embed=embed)
                         await asyncio.sleep(2)
                     except Exception as e:
-                        print(f"Erreur: {e}")
+                        print("Erreur tweet: " + str(e))
             sent_today = True
             await asyncio.sleep(60)
         elif now.hour == 10:
@@ -93,7 +94,7 @@ async def send_daily_tweets():
 @client.event
 async def on_ready():
     await tree.sync()
-    print(f"Bot connecte : {client.user}")
+    print("Bot connecte : " + str(client.user))
     client.loop.create_task(send_daily_tweets())
 
 @tree.command(name="tweet", description="Genere un tweet maintenant")
@@ -103,10 +104,13 @@ async def tweet_now(interaction: discord.Interaction):
     if not articles:
         await interaction.followup.send("Impossible de recuperer les articles.")
         return
-    import random
     article = random.choice(articles)
     tweet = generate_tweet(article)
-    embed = discord.Embed(title="Tweet genere", description="```" + tweet + "```", color=0xe8c96d)
+    embed = discord.Embed(
+        title="Tweet genere",
+        description="```" + tweet + "```",
+        color=0xe8c96d
+    )
     embed.add_field(name="Source", value=article["source"], inline=True)
     embed.add_field(name="Mots", value=str(len(tweet.split())) + "/30", inline=True)
     embed.add_field(name="Article", value=article["title"][:80], inline=False)
@@ -115,10 +119,3 @@ async def tweet_now(interaction: discord.Interaction):
     await interaction.followup.send(embed=embed)
 
 client.run(os.environ["DISCORD_TOKEN"])
-```
-
-Ensuite ouvre `requirements.txt` et remplace par :
-```
-discord.py
-feedparser
-google-generativeai
