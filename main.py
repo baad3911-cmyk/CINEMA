@@ -70,7 +70,7 @@ async def send_daily_tweets():
                         tweet = generate_tweet(article)
                         embed = discord.Embed(
                             title=f"Tweet #{i+1}",
-                            description=f"```{tweet}```",
+                            description="```" + tweet + "```",
                             color=0xe8c96d
                         )
                         embed.add_field(name="Source", value=article["source"], inline=True)
