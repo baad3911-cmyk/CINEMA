@@ -3,7 +3,7 @@ from discord import app_commands
 import os
 import asyncio
 import feedparser
-import google.generativeai as genai
+from groq import Groq
 from datetime import datetime
 import random
 
@@ -12,8 +12,7 @@ intents.message_content = True
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
 
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-model = genai.GenerativeModel("gemini-2.0-flash")
+groq_client = Groq(api_key=os.environ["GROQ_API_KEY"])
 
 CHANNEL_ID = int(os.environ["CHANNEL_ID"])
 
@@ -50,9 +49,21 @@ def get_top_articles():
     return articles
 
 def generate_tweet(article):
-    prompt = "You are a viral cinema Twitter account. Write a punchy English tweet about this movie news. Maximum 30 words. Strong opinion. Return ONLY the tweet text.\n\nTitle: " + article["title"] + "\nSummary: " + article["summary"]
-    response = model.generate_content(prompt)
-    return response.text.strip()
+    response = groq_client.chat.completions.create(
+        model="llama3-8b-8192",
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a viral cinema Twitter account. Write a punchy English tweet about movie news. Maximum 30 words. Strong opinion. Return ONLY the tweet text, nothing else."
+            },
+            {
+                "role": "user",
+                "content": "Title: " + article["title"] + "\nSummary: " + article["summary"]
+            }
+        ],
+        max_tokens=100
+    )
+    return response.choices[0].message.content.strip()
 
 async def send_daily_tweets():
     await client.wait_until_ready()
