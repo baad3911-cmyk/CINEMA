@@ -1,16 +1,19 @@
 import discord
 from discord import app_commands
-import anthropic
 import os
 import asyncio
 import feedparser
+import google.generativeai as genai
 from datetime import datetime
 
 intents = discord.Intents.default()
 intents.message_content = True
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
-anthropic_client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+
+genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+model = genai.GenerativeModel("gemini-1.5-flash")
+
 CHANNEL_ID = int(os.environ["CHANNEL_ID"])
 
 RSS_FEEDS = [
@@ -34,10 +37,6 @@ def get_top_articles():
                     image = entry.media_thumbnail[0].get("url")
                 elif "media_content" in entry:
                     image = entry.media_content[0].get("url")
-                elif "links" in entry:
-                    for link in entry.links:
-                        if link.get("type", "").startswith("image"):
-                            image = link.get("href")
                 articles.append({
                     "title": title,
                     "summary": summary,
@@ -49,13 +48,9 @@ def get_top_articles():
     return articles
 
 def generate_tweet(article):
-    message = anthropic_client.messages.create(
-        model="claude-sonnet-4-20250514",
-        max_tokens=100,
-        system="You are a viral cinema Twitter account. Write a punchy English tweet about this movie news. Maximum 30 words. Strong opinion. Return ONLY the tweet text, nothing else.",
-        messages=[{"role": "user", "content": f"Title: {article['title']}\nSummary: {article['summary']}"}]
-    )
-    return message.content[0].text.strip()
+    prompt = f"You are a viral cinema Twitter account. Write a punchy English tweet about this movie news. Maximum 30 words. Strong opinion. Return ONLY the tweet text.\n\nTitle: {article['title']}\nSummary: {article['summary']}"
+    response = model.generate_content(prompt)
+    return response.text.strip()
 
 async def send_daily_tweets():
     await client.wait_until_ready()
@@ -69,7 +64,7 @@ async def send_daily_tweets():
             if articles and channel:
                 import random
                 selected = random.sample(articles, min(3, len(articles)))
-                await channel.send("🎬 **Tes 3 tweets du jour sont arrivés !**")
+                await channel.send("🎬 **Tes 3 tweets du jour !**")
                 for i, article in enumerate(selected):
                     try:
                         tweet = generate_tweet(article)
@@ -120,3 +115,10 @@ async def tweet_now(interaction: discord.Interaction):
     await interaction.followup.send(embed=embed)
 
 client.run(os.environ["DISCORD_TOKEN"])
+```
+
+Ensuite ouvre `requirements.txt` et remplace par :
+```
+discord.py
+feedparser
+google-generativeai
