@@ -20,12 +20,14 @@ RSS_FEEDS = [
     "https://discussingfilm.net/feed/",
 ]
 
+SEND_HOURS = [6, 8, 10, 12, 14, 16, 17]
+
 def get_top_articles():
     articles = []
     for feed_url in RSS_FEEDS:
         try:
             feed = feedparser.parse(feed_url)
-            for entry in feed.entries[:15]:
+            for entry in feed.entries[:20]:
                 title = entry.get("title", "")
                 summary = entry.get("summary", "")[:300]
                 image = None
@@ -64,37 +66,36 @@ def generate_tweet(article):
 async def send_daily_tweets():
     await client.wait_until_ready()
     channel = client.get_channel(CHANNEL_ID)
-    sent_today = False
+    sent_hours = set()
 
     while not client.is_closed():
         now = datetime.now()
-        if now.hour == 9 and now.minute == 0 and not sent_today:
+
+        if now.hour in SEND_HOURS and now.minute == 0 and now.hour not in sent_hours:
             articles = get_top_articles()
             if articles and channel:
-                selected = random.sample(articles, min(7, len(articles)))
-                await channel.send("Tes 7 tweets du jour sont arrives !")
-                for i, article in enumerate(selected):
-                    try:
-                        tweet = generate_tweet(article)
-                        embed = discord.Embed(
-                            title="Tweet #" + str(i+1),
-                            description="```" + tweet + "```",
-                            color=0xe8c96d
-                        )
-                        embed.add_field(name="Source", value=article["source"], inline=True)
-                        embed.add_field(name="Mots", value=str(len(tweet.split())) + "/15", inline=True)
-                        embed.add_field(name="Article", value=article["title"][:80], inline=False)
-                        if article.get("image"):
-                            embed.set_image(url=article["image"])
-                        await channel.send(embed=embed)
-                        await asyncio.sleep(2)
-                    except Exception as e:
-                        print("Erreur tweet: " + str(e))
-            sent_today = True
+                article = random.choice(articles)
+                try:
+                    tweet = generate_tweet(article)
+                    embed = discord.Embed(
+                        title="Tweet " + str(now.hour) + "h",
+                        description="```" + tweet + "```",
+                        color=0xe8c96d
+                    )
+                    embed.add_field(name="Source", value=article["source"], inline=True)
+                    embed.add_field(name="Mots", value=str(len(tweet.split())) + "/15", inline=True)
+                    embed.add_field(name="Article", value=article["title"][:80], inline=False)
+                    if article.get("image"):
+                        embed.set_image(url=article["image"])
+                    await channel.send(embed=embed)
+                except Exception as e:
+                    print("Erreur tweet: " + str(e))
+            sent_hours.add(now.hour)
             await asyncio.sleep(60)
-        elif now.hour == 10:
-            sent_today = False
-            await asyncio.sleep(30)
+
+        elif now.hour == 0 and now.minute == 0:
+            sent_hours = set()
+            await asyncio.sleep(60)
         else:
             await asyncio.sleep(30)
 
