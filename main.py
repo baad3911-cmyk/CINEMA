@@ -17,11 +17,7 @@ groq_client = Groq(api_key=os.environ["GROQ_API_KEY"])
 CHANNEL_ID = int(os.environ["CHANNEL_ID"])
 
 RSS_FEEDS = [
-    "https://deadline.com/feed/",
-    "https://variety.com/feed/",
-    "https://www.hollywoodreporter.com/feed/",
-    "https://collider.com/feed/",
-    "https://screenrant.com/feed/",
+    "https://discussingfilm.net/feed/",
 ]
 
 def get_top_articles():
@@ -29,7 +25,7 @@ def get_top_articles():
     for feed_url in RSS_FEEDS:
         try:
             feed = feedparser.parse(feed_url)
-            for entry in feed.entries[:3]:
+            for entry in feed.entries[:15]:
                 title = entry.get("title", "")
                 summary = entry.get("summary", "")[:300]
                 image = None
@@ -40,7 +36,7 @@ def get_top_articles():
                 articles.append({
                     "title": title,
                     "summary": summary,
-                    "source": feed.feed.get("title", ""),
+                    "source": "DiscussingFilm",
                     "image": image
                 })
         except Exception as e:
@@ -54,7 +50,7 @@ def generate_tweet(article):
         messages=[
             {
                 "role": "system",
-                "content": "You are a viral cinema Twitter account. Write a punchy English tweet about this week movie news. Maximum 15 words. Very short and punchy. Return ONLY the tweet text, nothing else."
+                "content": "You are a viral cinema Twitter account. Write a punchy English tweet about this movie news. Maximum 15 words. Very short and punchy. Return ONLY the tweet text, nothing else."
             },
             {
                 "role": "user",
@@ -75,8 +71,8 @@ async def send_daily_tweets():
         if now.hour == 9 and now.minute == 0 and not sent_today:
             articles = get_top_articles()
             if articles and channel:
-                selected = random.sample(articles, min(3, len(articles)))
-                await channel.send("Tes 3 tweets du jour sont arrives !")
+                selected = random.sample(articles, min(7, len(articles)))
+                await channel.send("Tes 7 tweets du jour sont arrives !")
                 for i, article in enumerate(selected):
                     try:
                         tweet = generate_tweet(article)
