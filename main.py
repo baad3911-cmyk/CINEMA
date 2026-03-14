@@ -29,7 +29,7 @@ def get_top_articles():
     for feed_url in RSS_FEEDS:
         try:
             feed = feedparser.parse(feed_url)
-            for entry in feed.entries[:5]:
+            for entry in feed.entries[:3]:
                 title = entry.get("title", "")
                 summary = entry.get("summary", "")[:300]
                 image = None
@@ -50,18 +50,18 @@ def get_top_articles():
 
 def generate_tweet(article):
     response = groq_client.chat.completions.create(
-        model="llama-3.1-8b-instant",
+        model="llama3-8b-8192",
         messages=[
             {
                 "role": "system",
-                "content": "You are a viral cinema Twitter account. Write a punchy English tweet about movie news. Maximum 30 words. Strong opinion. Return ONLY the tweet text, nothing else."
+                "content": "You are a viral cinema Twitter account. Write a punchy English tweet about this week movie news. Maximum 15 words. Very short and punchy. Return ONLY the tweet text, nothing else."
             },
             {
                 "role": "user",
                 "content": "Title: " + article["title"] + "\nSummary: " + article["summary"]
             }
         ],
-        max_tokens=100
+        max_tokens=60
     )
     return response.choices[0].message.content.strip()
 
@@ -86,7 +86,7 @@ async def send_daily_tweets():
                             color=0xe8c96d
                         )
                         embed.add_field(name="Source", value=article["source"], inline=True)
-                        embed.add_field(name="Mots", value=str(len(tweet.split())) + "/30", inline=True)
+                        embed.add_field(name="Mots", value=str(len(tweet.split())) + "/15", inline=True)
                         embed.add_field(name="Article", value=article["title"][:80], inline=False)
                         if article.get("image"):
                             embed.set_image(url=article["image"])
@@ -123,7 +123,7 @@ async def tweet_now(interaction: discord.Interaction):
         color=0xe8c96d
     )
     embed.add_field(name="Source", value=article["source"], inline=True)
-    embed.add_field(name="Mots", value=str(len(tweet.split())) + "/30", inline=True)
+    embed.add_field(name="Mots", value=str(len(tweet.split())) + "/15", inline=True)
     embed.add_field(name="Article", value=article["title"][:80], inline=False)
     if article.get("image"):
         embed.set_image(url=article["image"])
